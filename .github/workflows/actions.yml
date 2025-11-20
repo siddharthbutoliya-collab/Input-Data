@@ -3,7 +3,7 @@ name: Run Input_Data.py
 on:
   schedule:
     # Run once per day at 00:30 UTC (6:00 AM IST)
-    - cron: '30 0 * * *'
+    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 jobs:
