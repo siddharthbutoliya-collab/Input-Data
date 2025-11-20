@@ -16,7 +16,7 @@ sec = os.getenv("PRABHAT_SECRET_KEY")
 User_name = os.getenv("USERNAME")
 service_account_json = os.getenv("SERVICE_ACCOUNT_JSON")
 MB_URl = os.getenv("METABASE_URL")
-QUERY_URL = os.getenv("DAILY_DUMP_QUERY")
+QUERY_URL = os.getenv("DAILY_INPUT_QUERY")
 SAK = os.getenv("SHEET_ACCESS_KEY")
 TARGET_SHEET = "Helper Call Dump"
 
