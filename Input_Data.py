@@ -94,7 +94,7 @@ def safe_update_range(worksheet, df, data_range, retries=5, delay=20):
 print("Fetching ONLY Input query...")
 
 # Fetch data
-input_response = fetch_with_retry(INPUT_QUERY_VAR, METABASE_HEADERS)
+input_response = fetch_with_retry(QUERY_URL, METABASE_HEADERS)
 df_Input = pd.DataFrame(input_response.json())
 
 # Columns for Input
