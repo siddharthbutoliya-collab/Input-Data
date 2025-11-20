@@ -1,4 +1,4 @@
-name: Run Dump.py
+name: Run Input_Data.py
 
 on:
   schedule:
@@ -24,17 +24,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Execute Dump.py safely
+      - name: Execute Input_Data.py safely
         env:
           PRABHAT_SECRET_KEY: ${{ secrets.PRABHAT_SECRET_KEY }}
           SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
           USERNAME: ${{ secrets.USERNAME }}
           METABASE_URL: ${{ secrets.METABASE_URL }}
-          DAILY_DUMP_QUERY: ${{ secrets.DAILY_DUMP_QUERY }}
+          DAILY_INPUT_QUERY: ${{ secrets.DAILY_INPUT_QUERY }}
           SHEET_ACCESS_KEY: ${{ secrets.SHEET_ACCESS_KEY }}
 
         run: |
-          LOCK_FILE=".dump.lock"
+          LOCK_FILE=".Input_Data.lock"
 
           echo "Workflow triggered at: $(date -u)"
 
@@ -44,9 +44,9 @@ jobs:
           fi
 
           touch $LOCK_FILE
-          echo "🚀 Running Dump.py..."
+          echo "🚀 Running Input_Data.py..."
           
-          python Dump.py
+          python Input_Data.py
           EXIT_CODE=$?
 
           rm -f $LOCK_FILE
