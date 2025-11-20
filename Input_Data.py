@@ -21,10 +21,6 @@ MB_URl = os.getenv("METABASE_URL")
 QUERY_URL = os.getenv("DAILY_INPUT_QUERY")
 SAK = os.getenv("SHEET_ACCESS_KEY")
 TARGET_SHEET = "Helper Call Dump"
-
-# ONLY INPUT QUERY
-INPUT_QUERY_VAR = os.getenv("INPUT_QUERY")
-
 SAK = os.getenv("SHEET_ACCESS_KEY")
 
 if not sec or not service_account_json:
@@ -113,16 +109,11 @@ print("Connecting to Google Sheets...")
 
 sheet = gc.open_by_key(SAK)
 ws_input = sheet.worksheet("Helper Call Dump")
-ws_pivot = sheet.worksheet("New_DS_Summary")
 
 # Update Input sheet safely
 print("Updating Helper Call Dump...")
 safe_update_range(ws_input, df_Input, "A:X")
 
-# Update timestamp
-current_time = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%d-%b-%Y %H:%M:%S")
-ws_pivot.update("B1", [[current_time]])
-print(f"✅ Updated timestamp: {current_time}")
 
 # -------------------- TIMER SUMMARY --------------------
 end_time = time.time()
