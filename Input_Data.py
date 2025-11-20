@@ -1,3 +1,4 @@
+
 import os
 import time
 import json
@@ -9,9 +10,10 @@ from zoneinfo import ZoneInfo
 from gspread_dataframe import set_with_dataframe
 from google.oauth2.service_account import Credentials
 
+# -------------------- START TIMER --------------------
 start_time = time.time()
 
-# -------------------- ENV --------------------
+# -------------------- ENV & AUTH --------------------
 sec = os.getenv("PRABHAT_SECRET_KEY")
 User_name = os.getenv("USERNAME")
 service_account_json = os.getenv("SERVICE_ACCOUNT_JSON")
@@ -20,10 +22,15 @@ QUERY_URL = os.getenv("DAILY_INPUT_QUERY")
 SAK = os.getenv("SHEET_ACCESS_KEY")
 TARGET_SHEET = "Helper Call Dump"
 
+# ONLY INPUT QUERY
+INPUT_QUERY_VAR = os.getenv("INPUT_QUERY")
+
+SAK = os.getenv("SHEET_ACCESS_KEY")
+
 if not sec or not service_account_json:
     raise ValueError("❌ Missing environment variables. Check GitHub secrets.")
 
-# -------------------- GOOGLE AUTH --------------------
+# Parse service account credentials
 service_info = json.loads(service_account_json)
 creds = Credentials.from_service_account_info(
     service_info,
@@ -31,8 +38,10 @@ creds = Credentials.from_service_account_info(
 )
 gc = gspread.authorize(creds)
 
-# -------------------- METABASE AUTH --------------------
+# -------------------- CONFIG --------------------
 METABASE_HEADERS = {'Content-Type': 'application/json'}
+
+# Create Metabase session
 res = requests.post(
     MB_URl,
     headers={"Content-Type": "application/json"},
@@ -43,7 +52,7 @@ token = res.json()['id']
 METABASE_HEADERS['X-Metabase-Session'] = token
 print("✅ Metabase session created")
 
-# -------------------- FETCH DATA --------------------
+# -------------------- UTILITIES --------------------
 def fetch_with_retry(url, headers, retries=5, delay=15):
     for attempt in range(1, retries + 1):
         try:
@@ -57,33 +66,69 @@ def fetch_with_retry(url, headers, retries=5, delay=15):
             else:
                 raise
 
-print("⏳ Fetching Metabase data...")
-response = fetch_with_retry(QUERY_URL, METABASE_HEADERS)
-df = pd.DataFrame(response.json())
+def safe_update_range(worksheet, df, data_range, retries=5, delay=20):
+    print(f"🔄 Preparing to update {worksheet.title} ({data_range})")
 
-df["Dump Date"] = datetime.now().strftime("%d/%m/%Y")
-print(f"📊 Rows fetched: {len(df)}")
+    backup_data = worksheet.get(data_range)
+    success = False
 
-# -------------------- APPEND SHEET --------------------
+    for attempt in range(1, retries + 1):
+        try:
+            set_with_dataframe(worksheet, df, include_index=False, include_column_header=True, resize=False)
+            print(f"✅ Successfully updated {worksheet.title}")
+            success = True
+            break
+        except Exception as e:
+            print(f"[Sheets] Attempt {attempt} failed for {worksheet.title}: {e}")
+            if attempt < retries:
+                time.sleep(delay)
+            else:
+                print(f"❌ All attempts failed for {worksheet.title}. Restoring backup...")
+                worksheet.update(data_range, backup_data)
+                print(f"✅ Backup restored for {worksheet.title}")
+                raise
+
+    return success
+
+# -------------------- MAIN LOGIC --------------------
+print("Fetching ONLY Input query...")
+
+# Fetch data
+input_response = fetch_with_retry(INPUT_QUERY_VAR, METABASE_HEADERS)
+df_Input = pd.DataFrame(input_response.json())
+
+# Columns for Input
+common_cols = [
+    'lead_created_on', 'modified_on', 'prospect_email', 'prospect_stage',
+    'mx_prospect_status', 'crm_user_role', 'sales_user_email', 'mx_utm_medium',
+    'mx_utm_source', 'mx_lead_quality_grade', 'mx_lead_inherent_intent',
+    'mx_priority_status', 'mx_organic_inbound', 'lead_last_call_status',
+    'mx_city', 'event', 'current_stage', 'previous_stage',
+    'mx_identifer', 'mx_phoenix_identifer'
+]
+
+df_Input = df_Input[common_cols + ['call_type', 'duration']]
+
+print("Connecting to Google Sheets...")
+
 sheet = gc.open_by_key(SAK)
-worksheet = sheet.worksheet(TARGET_SHEET)
+ws_input = sheet.worksheet("Helper Call Dump")
+ws_pivot = sheet.worksheet("New_DS_Summary")
 
-existing_data = worksheet.get_all_values()
+# Update Input sheet safely
+print("Updating Helper Call Dump...")
+safe_update_range(ws_input, df_Input, "A:X")
 
-if len(existing_data) == 0:
-    set_with_dataframe(
-        worksheet,
-        df,
-        include_index=False,
-        include_column_header=True
-    )
-    print("📝 First run — writing header + data")
-else:
-    last_row = len(existing_data)
-    values = df.values.tolist()
-    worksheet.update(f"A{last_row+1}", values)
-    print(f"➕ Appended {len(df)} rows")
+# Update timestamp
+current_time = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%d-%b-%Y %H:%M:%S")
+ws_pivot.update("B1", [[current_time]])
+print(f"✅ Updated timestamp: {current_time}")
 
-elapsed = int(time.time() - start_time)
-print(f"⏱ Done in {elapsed} seconds")
-print("🎯 Daily dump completed!")
+# -------------------- TIMER SUMMARY --------------------
+end_time = time.time()
+elapsed_time = end_time - start_time
+mins, secs = divmod(elapsed_time, 60)
+print(f"⏱ Total time taken: {int(mins)}m {int(secs)}s")
+
+print("🎯 Only Input Query executed successfully!")
+
